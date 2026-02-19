@@ -1,28 +1,33 @@
 package com.example.agenthq.ui.screens.dashboard
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -31,13 +36,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.agenthq.domain.model.AgentSessionStatus
-import com.example.agenthq.domain.model.AgentSessionUiModel
+import com.example.agenthq.ui.components.AgentPrCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +51,17 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Infinite rotation for the sync icon while refreshing
+    val infiniteTransition = rememberInfiniteTransition(label = "syncRotation")
+    val syncRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing)
+        ),
+        label = "rotation"
+    )
 
     Scaffold(
         topBar = {
@@ -59,7 +74,10 @@ fun DashboardScreen(
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sync"
+                            contentDescription = "Sync",
+                            modifier = Modifier.rotate(
+                                if (uiState.isRefreshing) syncRotation else 0f
+                            )
                         )
                     }
                 }
@@ -75,9 +93,7 @@ fun DashboardScreen(
         ) {
             when {
                 uiState.isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    ShimmerList()
                 }
                 uiState.error != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -97,24 +113,38 @@ fun DashboardScreen(
                     }
                 }
                 uiState.sessions.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No agent sessions found. Make sure you're watching repos with Copilot agent activity.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(24.dp)
-                        )
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn() + scaleIn(),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No agent sessions found. Make sure you're watching repos with Copilot agent activity.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(24.dp)
+                            )
+                        }
                     }
                 }
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+                        contentPadding = PaddingValues(16.dp)
                     ) {
                         items(uiState.sessions, key = { it.id }) { session ->
-                            AgentSessionItem(
-                                session = session,
+                            AgentPrCard(
+                                prTitle = session.prTitle,
+                                repoFullName = session.repoFullName,
+                                prNumber = session.prNumber,
+                                status = session.status.name.lowercase(),
+                                lastActivityAt = session.lastActivityAt,
+                                agentLogin = session.authorLogin,
                                 onClick = { onNavigateToSession(session.id) }
                             )
                         }
@@ -126,83 +156,32 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun AgentSessionItem(
-    session: AgentSessionUiModel,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun ShimmerList() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = session.repoFullName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                StatusBadge(status = session.status)
-            }
-            Text(
-                text = session.prTitle,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+        items(5) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+                    )
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "#${session.prNumber}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "by ${session.authorLogin}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = session.lastActivityAt,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
-    }
-}
-
-@Composable
-private fun StatusBadge(status: AgentSessionStatus) {
-    val (label, containerColor, contentColor) = when (status) {
-        AgentSessionStatus.ACTIVE -> Triple("Active", Color(0xFF1B5E20), Color.White)
-        AgentSessionStatus.COMPLETED -> Triple("Completed", Color(0xFF1565C0), Color.White)
-        AgentSessionStatus.FAILED -> Triple("Failed", Color(0xFFB71C1C), Color.White)
-        AgentSessionStatus.PAUSED -> Triple("Paused", Color(0xFFE65100), Color.White)
-    }
-    Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = containerColor
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-        )
     }
 }

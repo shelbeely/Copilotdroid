@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,7 +37,7 @@ import com.example.agenthq.ui.util.formatRelativeTime
 fun ReviewListItem(review: ReviewEntity) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .padding(12.dp)
@@ -73,6 +74,7 @@ fun ReviewListItem(review: ReviewEntity) {
             )
 
             if (review.body.isNotBlank()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
                 Text(
                     text = review.body,
                     style = MaterialTheme.typography.bodySmall,
@@ -89,11 +91,11 @@ fun ReviewListItem(review: ReviewEntity) {
 @Composable
 private fun ReviewStateBadge(state: String) {
     val (containerColor, contentColor, strikethrough) = when (state.uppercase()) {
-        "APPROVED" -> Triple(Color(0xFF1B5E20), Color.White, false)
-        "CHANGES_REQUESTED" -> Triple(Color(0xFFB71C1C), Color.White, false)
-        "COMMENTED" -> Triple(Color(0xFF616161), Color.White, false)
-        "DISMISSED" -> Triple(Color(0xFF424242), Color(0xFFBDBDBD), true)
-        else -> Triple(Color(0xFF424242), Color.White, false)
+        "APPROVED"           -> Triple(Color(0xFF1B5E20), Color.White, false)
+        "CHANGES_REQUESTED"  -> Triple(Color(0xFFB45309), Color.White, false)
+        "COMMENTED"          -> Triple(Color(0xFF6E7681), Color.White, false)
+        "DISMISSED"          -> Triple(Color(0xFF424242), Color(0xFFBDBDBD), true)
+        else                 -> Triple(Color(0xFF424242), Color.White, false)
     }
     Surface(shape = MaterialTheme.shapes.extraSmall, color = containerColor) {
         Text(
