@@ -1,0 +1,1 @@
+Improve UI density and Material styling.
