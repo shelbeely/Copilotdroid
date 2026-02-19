@@ -50,12 +50,14 @@ type PullRequest {
   body: String
   state: PullRequestState!
   isDraft: Boolean!
+  url: URI!
   author: Actor
   createdAt: DateTime!
   updatedAt: DateTime!
   headRefName: String!
   baseRefName: String!
   labels(first: Int): LabelConnection
+  commits(first: Int, last: Int): PullRequestCommitConnection!
 }
 
 type LabelConnection {
@@ -82,6 +84,31 @@ enum PullRequestState {
   OPEN
   CLOSED
   MERGED
+}
+
+type PullRequestCommitConnection {
+  nodes: [PullRequestCommit]
+}
+
+type PullRequestCommit {
+  commit: Commit!
+}
+
+type Commit {
+  id: ID!
+  statusCheckRollup: StatusCheckRollup
+}
+
+type StatusCheckRollup {
+  state: StatusState!
+}
+
+enum StatusState {
+  ERROR
+  EXPECTED
+  FAILURE
+  PENDING
+  SUCCESS
 }
 
 scalar URI

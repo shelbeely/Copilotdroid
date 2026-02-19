@@ -1,8 +1,10 @@
 package com.example.agenthq.di
 
 import android.content.Context
+import com.apollographql.apollo.ApolloClient
 import com.example.agenthq.auth.TokenStore
 import com.example.agenthq.data.remote.rest.GitHubApiService
+import com.apollographql.apollo.network.okHttpClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,6 +22,7 @@ import javax.inject.Singleton
 object NetworkModule {
 
     private const val GITHUB_API_BASE_URL = "https://api.github.com/"
+    private const val GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
     @Provides
     @Singleton
@@ -62,4 +65,12 @@ object NetworkModule {
     @Singleton
     fun provideGitHubApiService(retrofit: Retrofit): GitHubApiService =
         retrofit.create(GitHubApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideApolloClient(okHttpClient: OkHttpClient): ApolloClient =
+        ApolloClient.Builder()
+            .serverUrl(GITHUB_GRAPHQL_URL)
+            .okHttpClient(okHttpClient)
+            .build()
 }
