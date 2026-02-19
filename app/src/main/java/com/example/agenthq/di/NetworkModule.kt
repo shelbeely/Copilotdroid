@@ -1,9 +1,12 @@
 package com.example.agenthq.di
 
+import android.content.Context
+import com.example.agenthq.auth.TokenStore
 import com.example.agenthq.data.remote.rest.GitHubApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -20,10 +23,25 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient =
+    fun provideTokenStore(@ApplicationContext context: Context): TokenStore = TokenStore(context)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(tokenStore: TokenStore): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val token = tokenStore.getToken()
+                val request = if (token != null) {
+                    chain.request().newBuilder()
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                } else {
+                    chain.request()
+                }
+                chain.proceed(request)
+            }
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BASIC

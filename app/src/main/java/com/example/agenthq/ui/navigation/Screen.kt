@@ -1,6 +1,7 @@
 package com.example.agenthq.ui.navigation
 
 sealed class Screen(val route: String) {
+    data object Login : Screen("login")
     data object Dashboard : Screen("dashboard")
     data object PullRequests : Screen("pull_requests")
     data object PullRequestDetail : Screen("pull_request/{owner}/{repo}/{number}") {

@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -16,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.agenthq.ui.screens.analytics.AnalyticsScreen
+import com.example.agenthq.ui.screens.auth.LoginScreen
 import com.example.agenthq.ui.screens.dashboard.DashboardScreen
 import com.example.agenthq.ui.screens.pullrequest.PullRequestsScreen
 import com.example.agenthq.ui.screens.pullrequest.PullRequestDetailScreen
@@ -26,9 +28,16 @@ fun AgentHQNavHost() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val navViewModel: NavViewModel = hiltViewModel()
 
     val showBottomBar = bottomNavItems.any { item ->
         currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
+    }
+
+    val startDestination = if (navViewModel.isLoggedIn()) {
+        Screen.Dashboard.route
+    } else {
+        Screen.Login.route
     }
 
     Scaffold(
@@ -64,9 +73,18 @@ fun AgentHQNavHost() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Dashboard.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     onNavigateToPRs = {
