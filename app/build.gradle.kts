@@ -18,6 +18,10 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${findProperty("GITHUB_CLIENT_ID") ?: "your-client-id"}\"")
+        buildConfigField("String", "GITHUB_CLIENT_SECRET", "\"${findProperty("GITHUB_CLIENT_SECRET") ?: "your-client-secret"}\"")
+        buildConfigField("String", "GITHUB_REDIRECT_URI", "\"${findProperty("GITHUB_REDIRECT_URI") ?: "agenthq://oauth/callback"}\"")
     }
 
     buildTypes {
@@ -41,7 +45,9 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
 }
 
 dependencies {
