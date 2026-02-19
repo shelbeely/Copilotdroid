@@ -21,6 +21,9 @@ interface CommentDao {
     @Query("SELECT * FROM comments WHERE repoOwner = :owner AND repoName = :name AND prNumber = :prNumber AND isSteeringComment = 1 ORDER BY createdAt ASC")
     fun getSteeringComments(owner: String, name: String, prNumber: Int): Flow<List<CommentEntity>>
 
+    @Query("SELECT * FROM comments ORDER BY createdAt ASC")
+    fun getAll(): Flow<List<CommentEntity>>
+
     @Query("DELETE FROM comments WHERE repoOwner = :owner AND repoName = :name AND prNumber = :prNumber")
     suspend fun deleteForPr(owner: String, name: String, prNumber: Int)
 }
