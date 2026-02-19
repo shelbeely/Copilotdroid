@@ -8,6 +8,7 @@ import com.agenthq.app.data.local.dao.RepositoryDao
 import com.agenthq.app.data.local.entities.CachedComment
 import com.agenthq.app.data.local.entities.CachedPullRequest
 import com.agenthq.app.data.local.entities.CachedRepository
+import com.agenthq.app.data.session.SessionInferenceEngine
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,8 @@ class GitHubRepository @Inject constructor(
     private val api: GitHubRestService,
     private val repositoryDao: RepositoryDao,
     private val pullRequestDao: PullRequestDao,
-    private val commentDao: CommentDao
+    private val commentDao: CommentDao,
+    private val sessionInferenceEngine: SessionInferenceEngine
 ) {
 
     fun getCopilotSessions(): Flow<List<CachedPullRequest>> =
@@ -71,9 +73,7 @@ class GitHubRepository @Inject constructor(
             val response = api.listPullRequests(owner, repo, state)
             val prs = response.body() ?: continue
             pullRequestDao.insertAll(prs.map { pr ->
-                val isCopilot = pr.user.login.contains("[bot]") ||
-                    pr.user.login == "copilot" ||
-                    pr.labels.any { it.name.contains("copilot", ignoreCase = true) }
+                val isCopilot = sessionInferenceEngine.isCopilotSession(pr)
                 CachedPullRequest(
                     id = pr.id,
                     number = pr.number,
