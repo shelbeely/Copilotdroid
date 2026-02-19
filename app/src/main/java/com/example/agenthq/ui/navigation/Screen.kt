@@ -13,4 +13,8 @@ sealed class Screen(val route: String) {
             "steering/$owner/$repo/$number"
     }
     data object Analytics : Screen("analytics")
+    data object SessionDetail : Screen("session/{sessionId}") {
+        fun createRoute(sessionId: Long) = "session/$sessionId"
+    }
+    data object RepositoryPicker : Screen("repository_picker")
 }

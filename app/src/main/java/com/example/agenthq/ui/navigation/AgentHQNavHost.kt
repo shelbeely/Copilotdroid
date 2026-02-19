@@ -19,8 +19,10 @@ import androidx.navigation.compose.rememberNavController
 import com.example.agenthq.ui.screens.analytics.AnalyticsScreen
 import com.example.agenthq.ui.screens.auth.LoginScreen
 import com.example.agenthq.ui.screens.dashboard.DashboardScreen
-import com.example.agenthq.ui.screens.pullrequest.PullRequestsScreen
 import com.example.agenthq.ui.screens.pullrequest.PullRequestDetailScreen
+import com.example.agenthq.ui.screens.pullrequest.PullRequestsScreen
+import com.example.agenthq.ui.screens.repos.RepositoryPickerScreen
+import com.example.agenthq.ui.screens.session.SessionDetailScreen
 import com.example.agenthq.ui.screens.steering.SteeringScreen
 
 @Composable
@@ -89,6 +91,9 @@ fun AgentHQNavHost() {
                 DashboardScreen(
                     onNavigateToPRs = {
                         navController.navigate(Screen.PullRequests.route)
+                    },
+                    onNavigateToSession = { sessionId ->
+                        navController.navigate(Screen.SessionDetail.createRoute(sessionId))
                     }
                 )
             }
@@ -130,6 +135,26 @@ fun AgentHQNavHost() {
             }
             composable(Screen.Analytics.route) {
                 AnalyticsScreen()
+            }
+            composable(Screen.SessionDetail.route) {
+                SessionDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToPrReview = { owner, repo, prNumber ->
+                        navController.navigate(
+                            Screen.PullRequestDetail.createRoute(owner, repo, prNumber)
+                        )
+                    },
+                    onNavigateToSteering = { owner, repo, prNumber ->
+                        navController.navigate(
+                            Screen.Steering.createRoute(owner, repo, prNumber)
+                        )
+                    }
+                )
+            }
+            composable(Screen.RepositoryPicker.route) {
+                RepositoryPickerScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }
