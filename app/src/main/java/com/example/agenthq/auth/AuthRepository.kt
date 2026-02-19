@@ -1,7 +1,9 @@
 package com.example.agenthq.auth
 
+import com.example.agenthq.data.preferences.HostPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -17,22 +19,25 @@ sealed class AuthState {
 
 @Singleton
 class AuthRepository @Inject constructor(
-    private val tokenStore: TokenStore
+    private val tokenStore: TokenStore,
+    private val hostPreferences: HostPreferences
 ) {
     private val clientId: String
         get() = BuildConfigHelper.GITHUB_CLIENT_ID
 
-    private val deviceAuthService: GitHubDeviceAuthService by lazy {
+    private fun buildDeviceAuthService(oauthBase: String): GitHubDeviceAuthService =
         Retrofit.Builder()
-            .baseUrl("https://github.com/")
+            .baseUrl("$oauthBase/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GitHubDeviceAuthService::class.java)
-    }
 
     fun startDeviceFlow(): Flow<AuthState> = flow {
         emit(AuthState.Idle)
         try {
+            val host = hostPreferences.githubHost.first()
+            val oauthBase = HostPreferences.oauthBaseFor(host)
+            val deviceAuthService = buildDeviceAuthService(oauthBase)
             val deviceCodeResp = deviceAuthService.requestDeviceCode(clientId)
             emit(AuthState.WaitingForUser(deviceCodeResp.user_code, deviceCodeResp.verification_uri))
             val interval = (deviceCodeResp.interval * 1000L).coerceAtLeast(5000L)

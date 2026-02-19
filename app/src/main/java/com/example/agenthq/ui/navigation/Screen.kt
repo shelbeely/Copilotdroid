@@ -17,4 +17,5 @@ sealed class Screen(val route: String) {
         fun createRoute(sessionId: Long) = "session/$sessionId"
     }
     data object RepositoryPicker : Screen("repository_picker")
+    data object Settings : Screen("settings")
 }

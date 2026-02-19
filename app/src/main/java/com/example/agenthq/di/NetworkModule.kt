@@ -3,6 +3,7 @@ package com.example.agenthq.di
 import android.content.Context
 import com.apollographql.apollo.ApolloClient
 import com.example.agenthq.auth.TokenStore
+import com.example.agenthq.data.preferences.HostPreferences
 import com.example.agenthq.data.remote.rest.GitHubApiService
 import com.apollographql.apollo.network.okHttpClient
 import dagger.Module
@@ -10,6 +11,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -30,7 +34,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(tokenStore: TokenStore): OkHttpClient =
+    fun provideOkHttpClient(tokenStore: TokenStore, hostPreferences: HostPreferences): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -44,6 +48,34 @@ object NetworkModule {
                     chain.request()
                 }
                 chain.proceed(request)
+            }
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val currentHost = runBlocking { hostPreferences.githubHost.first() }
+                val isGraphql = request.url.encodedPath.endsWith("/graphql")
+                val targetBaseStr = if (isGraphql) {
+                    HostPreferences.graphqlHostFor(currentHost)
+                } else {
+                    HostPreferences.apiHostFor(currentHost)
+                }
+                val targetBase = targetBaseStr.toHttpUrl()
+                val newUrl = if (isGraphql) {
+                    request.url.newBuilder()
+                        .scheme(targetBase.scheme)
+                        .host(targetBase.host)
+                        .port(targetBase.port)
+                        .encodedPath(targetBase.encodedPath)
+                        .build()
+                } else {
+                    val prefix = targetBase.encodedPath.trimEnd('/')
+                    request.url.newBuilder()
+                        .scheme(targetBase.scheme)
+                        .host(targetBase.host)
+                        .port(targetBase.port)
+                        .encodedPath(prefix + request.url.encodedPath)
+                        .build()
+                }
+                chain.proceed(request.newBuilder().url(newUrl).build())
             }
             .addInterceptor(
                 HttpLoggingInterceptor().apply {

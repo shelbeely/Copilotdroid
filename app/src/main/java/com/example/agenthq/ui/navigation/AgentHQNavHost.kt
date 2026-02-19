@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -23,6 +24,7 @@ import com.example.agenthq.ui.screens.pullrequest.PullRequestDetailScreen
 import com.example.agenthq.ui.screens.pullrequest.PullRequestsScreen
 import com.example.agenthq.ui.screens.repos.RepositoryPickerScreen
 import com.example.agenthq.ui.screens.session.SessionDetailScreen
+import com.example.agenthq.ui.screens.settings.SettingsScreen
 import com.example.agenthq.ui.screens.steering.SteeringScreen
 
 @Composable
@@ -31,6 +33,13 @@ fun AgentHQNavHost() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val navViewModel: NavViewModel = hiltViewModel()
+    val context = LocalContext.current
+
+    val appVersion = try {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0"
+    } catch (_: Exception) {
+        "1.0"
+    }
 
     val showBottomBar = bottomNavItems.any { item ->
         currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
@@ -94,6 +103,9 @@ fun AgentHQNavHost() {
                     },
                     onNavigateToSession = { sessionId ->
                         navController.navigate(Screen.SessionDetail.createRoute(sessionId))
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }
@@ -154,6 +166,17 @@ fun AgentHQNavHost() {
             composable(Screen.RepositoryPicker.route) {
                 RepositoryPickerScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onSignOut = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    appVersion = appVersion
                 )
             }
         }
