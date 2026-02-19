@@ -3,6 +3,9 @@ package com.example.agenthq.ui.screens.pullrequest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -22,12 +27,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.agenthq.data.local.PullRequestEntity
-import com.example.agenthq.data.local.ReviewEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +59,16 @@ fun PullRequestDetailScreen(
     viewModel: PullRequestDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showReviewSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.snackbarMessage) {
+        val msg = uiState.snackbarMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            viewModel.snackbarMessageShown()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -76,18 +96,17 @@ fun PullRequestDetailScreen(
         bottomBar = {
             BottomAppBar {
                 Button(
-                    onClick = { viewModel.submitReview("") },
+                    onClick = { showReviewSheet = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    enabled = !uiState.isSubmittingReview && !uiState.reviewSubmitted
+                    enabled = !uiState.isSubmittingReview
                 ) {
-                    Text(
-                        if (uiState.reviewSubmitted) "Review Submitted" else "Submit Review"
-                    )
+                    Text(if (uiState.isSubmittingReview) "Submitting\u2026" else "Submit Review")
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         when {
             uiState.isLoading -> {
@@ -124,7 +143,7 @@ fun PullRequestDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item { PrInfoCard(pr = uiState.pullRequest, owner = owner, repo = repo) }
@@ -141,21 +160,27 @@ fun PullRequestDetailScreen(
                         }
                     } else {
                         items(uiState.reviews, key = { it.id }) { review ->
-                            PrReviewItem(review = review)
+                            ReviewListItem(review = review)
                         }
                     }
-                    item { Spacer(Modifier.height(4.dp)) }
-                    item {
-                        Text("Changed Files", style = MaterialTheme.typography.titleMedium)
-                    }
-                    item { ChangedFilesPlaceholder() }
-                    item { Spacer(Modifier.height(72.dp)) } // space for bottom bar
+                    item { Spacer(Modifier.height(72.dp)) }
                 }
             }
         }
     }
+
+    if (showReviewSheet) {
+        ReviewSubmitSheet(
+            onDismiss = { showReviewSheet = false },
+            onSubmit = { event, body ->
+                showReviewSheet = false
+                viewModel.submitReview(event, body)
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PrInfoCard(pr: PullRequestEntity?, owner: String, repo: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -169,18 +194,28 @@ private fun PrInfoCard(pr: PullRequestEntity?, owner: String, repo: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (pr != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = "State:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     PrStateBadge(state = pr.state)
+                    if (pr.isDraft) {
+                        DraftBadge()
+                    }
+                    CiStatusChip(ciStatus = null)
                 }
+
+                if (pr.labels.isNotBlank()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        pr.labels.split(",").filter { it.isNotBlank() }.forEach { label ->
+                            LabelChip(label = label.trim())
+                        }
+                    }
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Author:",
@@ -196,7 +231,7 @@ private fun PrInfoCard(pr: PullRequestEntity?, owner: String, repo: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${pr.headRef} → ${pr.baseRef}",
+                        text = "${pr.headRef} \u2192 ${pr.baseRef}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -238,65 +273,28 @@ private fun PrStateBadge(state: String) {
 }
 
 @Composable
-private fun PrReviewItem(review: ReviewEntity) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = review.authorLogin, style = MaterialTheme.typography.titleSmall)
-                ReviewStateBadge(state = review.state)
-            }
-            if (review.body.isNotBlank()) {
-                Text(
-                    text = review.body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReviewStateBadge(state: String) {
-    val (containerColor, contentColor) = when (state.uppercase()) {
-        "APPROVED" -> Color(0xFF1B5E20) to Color.White
-        "CHANGES_REQUESTED" -> Color(0xFFB71C1C) to Color.White
-        "COMMENTED" -> Color(0xFF1565C0) to Color.White
-        else -> Color(0xFF424242) to Color.White
-    }
-    Surface(shape = MaterialTheme.shapes.extraSmall, color = containerColor) {
+private fun DraftBadge() {
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
         Text(
-            text = state.replace("_", " "),
+            text = "Draft",
             style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
         )
     }
 }
 
 @Composable
-private fun ChangedFilesPlaceholder() {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "File diff view",
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = "Sync the PR to view changed files",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+private fun LabelChip(label: String) {
+    AssistChip(
+        onClick = {},
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    )
 }
