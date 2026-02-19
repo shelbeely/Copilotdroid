@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun LoginScreen(
+    onLoginSuccess: () -> Unit = {},
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,6 +85,9 @@ fun LoginScreen(
             }
 
             is AuthUiState.Authenticated -> {
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    onLoginSuccess()
+                }
                 Text(
                     text = "You are signed in.",
                     style = MaterialTheme.typography.bodyLarge,
