@@ -1,5 +1,6 @@
 package com.example.agenthq.domain.usecase
 
+import androidx.annotation.VisibleForTesting
 import com.example.agenthq.data.local.AgentSessionEntity
 import com.example.agenthq.data.local.PullRequestEntity
 import java.time.Instant
@@ -10,6 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class InferSessionUseCase @Inject constructor() {
 
+    @VisibleForTesting
     fun isAgentPr(pr: PullRequestEntity): Boolean {
         // Rule 1: bot author
         if (pr.authorLogin.contains("[bot]", ignoreCase = true)) return true
@@ -25,6 +27,7 @@ class InferSessionUseCase @Inject constructor() {
         return false
     }
 
+    @VisibleForTesting
     fun inferStatus(pr: PullRequestEntity): String {
         val updatedAt = runCatching { Instant.parse(pr.updatedAt) }.getOrNull()
         val isRecent = updatedAt?.let {

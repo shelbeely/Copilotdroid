@@ -3,6 +3,7 @@ package com.example.agenthq.domain.usecase
 import com.example.agenthq.auth.TokenStore
 import com.example.agenthq.data.local.RepositoryDao
 import com.example.agenthq.data.repository.PullRequestRepository
+import com.example.agenthq.util.Logger
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,10 +20,12 @@ class SyncSessionsUseCase @Inject constructor(
     suspend operator fun invoke() {
         val token = tokenStore.getToken() ?: return
         val repos = repositoryDao.getAll().first()
+        if (repos.isEmpty()) return
         for (repo in repos) {
-            runCatching {
-                pullRequestRepository.syncRepo(token, repo.owner, repo.name)
-            }
+            pullRequestRepository.syncRepo(token, repo.owner, repo.name)
+                .onFailure { e ->
+                    Logger.e("Sync failed for ${repo.owner}/${repo.name}", e)
+                }
         }
     }
 }

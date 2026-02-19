@@ -34,8 +34,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(tokenStore: TokenStore, hostPreferences: HostPreferences): OkHttpClient =
-        OkHttpClient.Builder()
+    fun provideOkHttpClient(tokenStore: TokenStore, hostPreferences: HostPreferences): OkHttpClient {
+        // Read the host once during singleton creation to avoid runBlocking on every request.
+        // DataStore's first() call is fast after initial load. If the user changes the host,
+        // the app must be restarted; a future improvement would subscribe to host changes.
+        val initialHost = runBlocking { hostPreferences.githubHost.first() }
+        return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
@@ -51,7 +55,7 @@ object NetworkModule {
             }
             .addInterceptor { chain ->
                 val request = chain.request()
-                val currentHost = runBlocking { hostPreferences.githubHost.first() }
+                val currentHost = initialHost
                 val isGraphql = request.url.encodedPath.endsWith("/graphql")
                 val targetBaseStr = if (isGraphql) {
                     HostPreferences.graphqlHostFor(currentHost)
@@ -83,6 +87,7 @@ object NetworkModule {
                 }
             )
             .build()
+    }
 
     @Provides
     @Singleton

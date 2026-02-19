@@ -26,7 +26,12 @@ object DatabaseModule {
             context,
             AgentHQDatabase::class.java,
             "agent_hq.db"
-        ).fallbackToDestructiveMigration().build()
+        )
+            // TODO: Replace with addMigrations() before the first production release.
+            // fallbackToDestructiveMigration is acceptable while the app has no shipped users,
+            // but must be removed once users have production data to preserve.
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     fun providePullRequestDao(db: AgentHQDatabase): PullRequestDao = db.pullRequestDao()

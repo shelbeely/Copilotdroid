@@ -41,12 +41,13 @@ class PullRequestRepository @Inject constructor(
         }
 
     /** Refresh PRs via GraphQL (preferred) with REST fallback. */
-    suspend fun refreshPullRequests(token: String, owner: String, repo: String) {
-        val graphqlSuccess = tryRefreshViaGraphQL(owner, repo)
-        if (!graphqlSuccess) {
-            refreshPullRequestsViaRest(token, owner, repo)
+    suspend fun refreshPullRequests(token: String, owner: String, repo: String): Result<Unit> =
+        runCatching {
+            val graphqlSuccess = tryRefreshViaGraphQL(owner, repo)
+            if (!graphqlSuccess) {
+                refreshPullRequestsViaRest(token, owner, repo)
+            }
         }
-    }
 
     private suspend fun tryRefreshViaGraphQL(owner: String, repo: String): Boolean {
         return try {
@@ -138,8 +139,9 @@ class PullRequestRepository @Inject constructor(
      * Pages through all PRs for the given repo via REST, runs session inference,
      * and upserts [PullRequestEntity] and [com.example.agenthq.data.local.AgentSessionEntity] to Room.
      */
-    suspend fun syncRepo(token: String, owner: String, repo: String) {
-        val allDtos = buildList {
+    suspend fun syncRepo(token: String, owner: String, repo: String): Result<Unit> =
+        runCatching {
+            val allDtos = buildList {
             var page = 1
             while (true) {
                 val page_dtos = api.getPullRequests(
