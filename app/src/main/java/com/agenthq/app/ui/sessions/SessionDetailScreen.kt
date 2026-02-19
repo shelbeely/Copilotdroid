@@ -20,10 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +53,7 @@ import com.agenthq.app.data.local.entities.CachedPullRequest
 @Composable
 fun SessionDetailScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToReview: (owner: String, repo: String, pullNumber: Int) -> Unit,
     viewModel: SessionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -73,6 +76,21 @@ fun SessionDetailScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        floatingActionButton = {
+            val state = uiState
+            if (state is SessionDetailUiState.Success) {
+                val pr = state.pullRequest
+                val parts = pr.repoFullName.split("/")
+                FloatingActionButton(
+                    onClick = { onNavigateToReview(parts[0], parts[1], pr.number) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RateReview,
+                        contentDescription = "Review Changes"
+                    )
+                }
+            }
         }
     ) { innerPadding ->
         when (val state = uiState) {
