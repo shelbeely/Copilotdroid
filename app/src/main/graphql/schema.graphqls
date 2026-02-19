@@ -1,0 +1,115 @@
+"""
+GitHub GraphQL API schema stub.
+Full schema can be downloaded from https://docs.github.com/en/graphql/overview/public-schema
+"""
+
+type Query {
+  viewer: User!
+  repository(owner: String!, name: String!): Repository
+}
+
+type User {
+  id: ID!
+  login: String!
+  name: String
+  avatarUrl: URI!
+  email: String!
+}
+
+type Repository {
+  id: ID!
+  name: String!
+  owner: RepositoryOwner!
+  description: String
+  pullRequests(first: Int, after: String, states: [PullRequestState!]): PullRequestConnection!
+}
+
+interface RepositoryOwner {
+  id: ID!
+  login: String!
+  avatarUrl: URI!
+}
+
+type Organization implements RepositoryOwner {
+  id: ID!
+  login: String!
+  avatarUrl: URI!
+  name: String
+}
+
+type PullRequestConnection {
+  nodes: [PullRequest]
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PullRequest {
+  id: ID!
+  number: Int!
+  title: String!
+  body: String
+  state: PullRequestState!
+  isDraft: Boolean!
+  url: URI!
+  author: Actor
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  headRefName: String!
+  baseRefName: String!
+  labels(first: Int): LabelConnection
+  commits(first: Int, last: Int): PullRequestCommitConnection!
+}
+
+type LabelConnection {
+  nodes: [Label]
+}
+
+type Label {
+  id: ID!
+  name: String!
+  color: String!
+}
+
+interface Actor {
+  login: String!
+  avatarUrl: URI!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+enum PullRequestState {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+type PullRequestCommitConnection {
+  nodes: [PullRequestCommit]
+}
+
+type PullRequestCommit {
+  commit: Commit!
+}
+
+type Commit {
+  id: ID!
+  statusCheckRollup: StatusCheckRollup
+}
+
+type StatusCheckRollup {
+  state: StatusState!
+}
+
+enum StatusState {
+  ERROR
+  EXPECTED
+  FAILURE
+  PENDING
+  SUCCESS
+}
+
+scalar URI
+scalar DateTime

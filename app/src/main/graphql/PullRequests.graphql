@@ -1,0 +1,44 @@
+query GetViewerPullRequests($owner: String!, $repo: String!, $first: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: $first, after: $after, states: [OPEN]) {
+      nodes {
+        id
+        number
+        title
+        body
+        state
+        isDraft
+        author {
+          login
+          avatarUrl
+        }
+        createdAt
+        updatedAt
+        headRefName
+        baseRefName
+        labels(first: 10) {
+          nodes {
+            id
+            name
+            color
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      totalCount
+    }
+  }
+}
+
+query GetViewer {
+  viewer {
+    id
+    login
+    name
+    avatarUrl
+    email
+  }
+}

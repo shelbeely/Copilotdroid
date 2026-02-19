@@ -1,0 +1,113 @@
+package com.example.agenthq.di
+
+import android.content.Context
+import com.apollographql.apollo.ApolloClient
+import com.example.agenthq.auth.TokenStore
+import com.example.agenthq.data.preferences.HostPreferences
+import com.example.agenthq.data.remote.rest.GitHubApiService
+import com.apollographql.apollo.network.okHttpClient
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    private const val GITHUB_API_BASE_URL = "https://api.github.com/"
+    private const val GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
+
+    @Provides
+    @Singleton
+    fun provideTokenStore(@ApplicationContext context: Context): TokenStore = TokenStore(context)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(tokenStore: TokenStore, hostPreferences: HostPreferences): OkHttpClient {
+        // Read the host once during singleton creation to avoid runBlocking on every request.
+        // DataStore's first() call is fast after initial load. If the user changes the host,
+        // the app must be restarted; a future improvement would subscribe to host changes.
+        val initialHost = runBlocking { hostPreferences.githubHost.first() }
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val token = tokenStore.getToken()
+                val request = if (token != null) {
+                    chain.request().newBuilder()
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                } else {
+                    chain.request()
+                }
+                chain.proceed(request)
+            }
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val currentHost = initialHost
+                val isGraphql = request.url.encodedPath.endsWith("/graphql")
+                val targetBaseStr = if (isGraphql) {
+                    HostPreferences.graphqlHostFor(currentHost)
+                } else {
+                    HostPreferences.apiHostFor(currentHost)
+                }
+                val targetBase = targetBaseStr.toHttpUrl()
+                val newUrl = if (isGraphql) {
+                    request.url.newBuilder()
+                        .scheme(targetBase.scheme)
+                        .host(targetBase.host)
+                        .port(targetBase.port)
+                        .encodedPath(targetBase.encodedPath)
+                        .build()
+                } else {
+                    val prefix = targetBase.encodedPath.trimEnd('/')
+                    request.url.newBuilder()
+                        .scheme(targetBase.scheme)
+                        .host(targetBase.host)
+                        .port(targetBase.port)
+                        .encodedPath(prefix + request.url.encodedPath)
+                        .build()
+                }
+                chain.proceed(request.newBuilder().url(newUrl).build())
+            }
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                }
+            )
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(GITHUB_API_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideGitHubApiService(retrofit: Retrofit): GitHubApiService =
+        retrofit.create(GitHubApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideApolloClient(okHttpClient: OkHttpClient): ApolloClient =
+        ApolloClient.Builder()
+            .serverUrl(GITHUB_GRAPHQL_URL)
+            .okHttpClient(okHttpClient)
+            .build()
+}
