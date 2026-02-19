@@ -4,6 +4,9 @@ import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.exception.ApolloException
 import com.example.agenthq.data.local.AgentSessionDao
+import com.example.agenthq.data.local.AgentHQDatabase
+import com.example.agenthq.data.local.CommentDao
+import com.example.agenthq.data.local.CommentEntity
 import com.example.agenthq.data.local.PullRequestDao
 import com.example.agenthq.data.local.PullRequestEntity
 import com.example.agenthq.data.remote.rest.CreateCommentRequest
@@ -18,6 +21,7 @@ import com.example.agenthq.domain.usecase.InferSessionUseCase
 import com.example.agenthq.graphql.GetPullRequestsQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import androidx.room.withTransaction
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +31,8 @@ class PullRequestRepository @Inject constructor(
     private val apolloClient: ApolloClient,
     private val dao: PullRequestDao,
     private val agentSessionDao: AgentSessionDao,
+    private val commentDao: CommentDao,
+    private val db: AgentHQDatabase,
     private val inferSessionUseCase: InferSessionUseCase
 ) {
     fun observePullRequests(owner: String, repo: String): Flow<List<PullRequest>> =
@@ -227,7 +233,32 @@ class PullRequestRepository @Inject constructor(
         body: String
     ): Result<IssueCommentDto> =
         runCatching {
-            api.createIssueComment("Bearer $token", owner, repo, issueNumber, CreateCommentRequest(body))
+            val dto = api.createIssueComment("Bearer $token", owner, repo, issueNumber, CreateCommentRequest(body))
+            val prEntity = dao.getByNumber(owner, repo, issueNumber)
+            if (prEntity != null) {
+                db.withTransaction {
+                    val comment = CommentEntity(
+                        id = dto.id,
+                        pullRequestId = prEntity.id,
+                        prNumber = issueNumber,
+                        repoOwner = owner,
+                        repoName = repo,
+                        commentType = "ISSUE_COMMENT",
+                        authorLogin = dto.user.login,
+                        body = dto.body,
+                        path = null,
+                        position = null,
+                        createdAt = dto.createdAt,
+                        isSteeringComment = true
+                    )
+                    commentDao.insert(comment)
+                    val session = agentSessionDao.getByPrId(prEntity.id)
+                    if (session != null) {
+                        agentSessionDao.upsert(session.copy(steeringCommentCount = session.steeringCommentCount + 1))
+                    }
+                }
+            }
+            dto
         }
 
     private fun PullRequestEntity.toDomain() = PullRequest(
