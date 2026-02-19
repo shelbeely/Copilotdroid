@@ -3,6 +3,7 @@ package com.example.agenthq.data.repository
 import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.exception.ApolloException
+import com.example.agenthq.data.local.AgentSessionDao
 import com.example.agenthq.data.local.PullRequestDao
 import com.example.agenthq.data.local.PullRequestEntity
 import com.example.agenthq.data.remote.rest.CreateCommentRequest
@@ -13,6 +14,7 @@ import com.example.agenthq.data.remote.rest.ReviewCommentDto
 import com.example.agenthq.data.remote.rest.ReviewDto
 import com.example.agenthq.domain.model.PullRequest
 import com.example.agenthq.domain.model.PullRequestState
+import com.example.agenthq.domain.usecase.InferSessionUseCase
 import com.example.agenthq.graphql.GetPullRequestsQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -23,7 +25,9 @@ import javax.inject.Singleton
 class PullRequestRepository @Inject constructor(
     private val api: GitHubApiService,
     private val apolloClient: ApolloClient,
-    private val dao: PullRequestDao
+    private val dao: PullRequestDao,
+    private val agentSessionDao: AgentSessionDao,
+    private val inferSessionUseCase: InferSessionUseCase
 ) {
     fun observePullRequests(owner: String, repo: String): Flow<List<PullRequest>> =
         dao.getAllForRepo(owner, repo).map { entities ->
@@ -53,10 +57,11 @@ class PullRequestRepository @Inject constructor(
                 ?: return false
 
             val entities = nodes.filterNotNull().map { node ->
-                val isAgentPr = node.labels?.nodes
+                val labelsCsv = node.labels?.nodes
                     ?.filterNotNull()
-                    ?.any { it.name.contains("copilot", ignoreCase = true) } == true
-                PullRequestEntity(
+                    ?.joinToString(",") { it.name }
+                    ?: ""
+                val entity = PullRequestEntity(
                     id = node.number.toLong(),
                     number = node.number,
                     title = node.title,
@@ -73,12 +78,14 @@ class PullRequestRepository @Inject constructor(
                     updatedAt = node.updatedAt.toString(),
                     isDraft = false,
                     mergedAt = null,
-                    labels = "[]",
-                    isAgentPr = isAgentPr,
+                    labels = labelsCsv,
+                    isAgentPr = false,
                     lastSyncedAt = System.currentTimeMillis()
                 )
+                entity.copy(isAgentPr = inferSessionUseCase.isAgentPr(entity))
             }
             dao.upsertAll(entities)
+            upsertSessions(entities)
             true
         } catch (e: ApolloException) {
             false
@@ -93,8 +100,8 @@ class PullRequestRepository @Inject constructor(
             state = "all"
         )
         val entities = dtos.map { dto ->
-            val isAgentPr = dto.labels.any { it.name.contains("copilot", ignoreCase = true) }
-            PullRequestEntity(
+            val labelsCsv = dto.labels.joinToString(",") { it.name }
+            val entity = PullRequestEntity(
                 id = dto.id,
                 number = dto.number,
                 title = dto.title,
@@ -102,7 +109,7 @@ class PullRequestRepository @Inject constructor(
                 state = dto.state.uppercase(),
                 repoOwner = owner,
                 repoName = repo,
-                htmlUrl = "",
+                htmlUrl = dto.htmlUrl,
                 headRef = dto.head.ref,
                 baseRef = dto.base.ref,
                 authorLogin = dto.user.login,
@@ -110,13 +117,85 @@ class PullRequestRepository @Inject constructor(
                 createdAt = dto.createdAt,
                 updatedAt = dto.updatedAt,
                 isDraft = dto.draft,
-                mergedAt = null,
-                labels = "[]",
-                isAgentPr = isAgentPr,
+                mergedAt = dto.mergedAt,
+                labels = labelsCsv,
+                isAgentPr = false,
                 lastSyncedAt = System.currentTimeMillis()
             )
+            entity.copy(isAgentPr = inferSessionUseCase.isAgentPr(entity))
         }
         dao.upsertAll(entities)
+        upsertSessions(entities)
+    }
+
+    /**
+     * Pages through all PRs for the given repo via REST, runs session inference,
+     * and upserts [PullRequestEntity] and [com.example.agenthq.data.local.AgentSessionEntity] to Room.
+     */
+    suspend fun syncRepo(token: String, owner: String, repo: String) {
+        val allDtos = buildList {
+            var page = 1
+            while (true) {
+                val page_dtos = api.getPullRequests(
+                    token = "Bearer $token",
+                    owner = owner,
+                    repo = repo,
+                    state = "all",
+                    perPage = 100,
+                    page = page
+                )
+                addAll(page_dtos)
+                if (page_dtos.size < 100) break
+                page++
+            }
+        }
+        val entities = allDtos.map { dto ->
+            val labelsCsv = dto.labels.joinToString(",") { it.name }
+            val entity = PullRequestEntity(
+                id = dto.id,
+                number = dto.number,
+                title = dto.title,
+                body = dto.body ?: "",
+                state = dto.state.uppercase(),
+                repoOwner = owner,
+                repoName = repo,
+                htmlUrl = dto.htmlUrl,
+                headRef = dto.head.ref,
+                baseRef = dto.base.ref,
+                authorLogin = dto.user.login,
+                authorAvatarUrl = dto.user.avatarUrl ?: "",
+                createdAt = dto.createdAt,
+                updatedAt = dto.updatedAt,
+                isDraft = dto.draft,
+                mergedAt = dto.mergedAt,
+                labels = labelsCsv,
+                isAgentPr = false,
+                lastSyncedAt = System.currentTimeMillis()
+            )
+            entity.copy(isAgentPr = inferSessionUseCase.isAgentPr(entity))
+        }
+        dao.upsertAll(entities)
+        upsertSessions(entities)
+    }
+
+    /** Upserts agent sessions for agent PRs and removes sessions for non-agent PRs. */
+    private suspend fun upsertSessions(entities: List<PullRequestEntity>) {
+        val agentEntities = entities.filter { it.isAgentPr }
+        val sessions = agentEntities.mapNotNull { pr ->
+            val existing = agentSessionDao.getByPrId(pr.id)
+            inferSessionUseCase.buildSession(pr, existing)
+        }
+        if (sessions.isNotEmpty()) {
+            agentSessionDao.upsertAll(sessions)
+        }
+        // Remove sessions whose PR is no longer an agent PR
+        val nonAgentPrIds = entities.filter { !it.isAgentPr }.map { it.id }
+        for (prId in nonAgentPrIds) {
+            val orphan = agentSessionDao.getByPrId(prId)
+            if (orphan != null) {
+                agentSessionDao.deleteByPrId(prId)
+            }
+        }
     }
 
     suspend fun getReviews(token: String, owner: String, repo: String, pullNumber: Int): Result<List<ReviewDto>> =

@@ -21,7 +21,7 @@ data class PullRequestEntity(
     val createdAt: String,
     val updatedAt: String,
     val mergedAt: String?,
-    /** JSON array of label name strings */
+    /** Comma-separated label names, e.g. "copilot,bug,enhancement" */
     val labels: String,
     val isAgentPr: Boolean,
     val lastSyncedAt: Long

@@ -29,4 +29,7 @@ interface AgentSessionDao {
 
     @Query("DELETE FROM agent_sessions")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM agent_sessions WHERE pullRequestId = :prId")
+    suspend fun deleteByPrId(prId: Long)
 }
