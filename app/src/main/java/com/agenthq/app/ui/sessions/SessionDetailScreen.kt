@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.RateReview
 import androidx.compose.material3.Card
@@ -54,6 +55,7 @@ import com.agenthq.app.data.local.entities.CachedPullRequest
 fun SessionDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToReview: (owner: String, repo: String, pullNumber: Int) -> Unit,
+    onNavigateToSteering: (owner: String, repo: String, issueNumber: Int) -> Unit,
     viewModel: SessionDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,13 +84,27 @@ fun SessionDetailScreen(
             if (state is SessionDetailUiState.Success) {
                 val pr = state.pullRequest
                 val parts = pr.repoFullName.split("/")
-                FloatingActionButton(
-                    onClick = { onNavigateToReview(parts[0], parts[1], pr.number) }
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.RateReview,
-                        contentDescription = "Review Changes"
-                    )
+                    FloatingActionButton(
+                        onClick = { onNavigateToSteering(parts[0], parts[1], pr.number) },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Steer Agent"
+                        )
+                    }
+                    FloatingActionButton(
+                        onClick = { onNavigateToReview(parts[0], parts[1], pr.number) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.RateReview,
+                            contentDescription = "Review Changes"
+                        )
+                    }
                 }
             }
         }

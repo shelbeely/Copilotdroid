@@ -12,6 +12,7 @@ import com.agenthq.app.ui.review.PRReviewScreen
 import com.agenthq.app.ui.sessions.SessionDetailScreen
 import com.agenthq.app.ui.sessions.SessionFeedScreen
 import com.agenthq.app.ui.settings.SettingsScreen
+import com.agenthq.app.ui.steering.SteeringScreen
 
 object Routes {
     const val LOGIN = "login"
@@ -19,10 +20,13 @@ object Routes {
     const val SESSION_DETAIL = "session_detail/{prId}"
     const val SETTINGS = "settings"
     const val PR_REVIEW = "pr_review/{owner}/{repo}/{pullNumber}"
+    const val STEERING = "steering/{owner}/{repo}/{issueNumber}"
 
     fun sessionDetail(prId: Long) = "session_detail/$prId"
     fun prReview(owner: String, repo: String, pullNumber: Int) =
         "pr_review/$owner/$repo/$pullNumber"
+    fun steering(owner: String, repo: String, issueNumber: Int) =
+        "steering/$owner/$repo/$issueNumber"
 }
 
 @Composable
@@ -60,6 +64,9 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToReview = { owner, repo, pullNumber ->
                     navController.navigate(Routes.prReview(owner, repo, pullNumber))
+                },
+                onNavigateToSteering = { owner, repo, issueNumber ->
+                    navController.navigate(Routes.steering(owner, repo, issueNumber))
                 }
             )
         }
@@ -72,6 +79,18 @@ fun AppNavigation(
             )
         ) {
             PRReviewScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = Routes.STEERING,
+            arguments = listOf(
+                navArgument("owner") { type = NavType.StringType },
+                navArgument("repo") { type = NavType.StringType },
+                navArgument("issueNumber") { type = NavType.IntType }
+            )
+        ) {
+            SteeringScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
