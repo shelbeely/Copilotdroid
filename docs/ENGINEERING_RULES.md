@@ -1,0 +1,1 @@
+No placeholders. No fake APIs. Fail loudly when uncertain.

@@ -1,0 +1,1 @@
+Add GitHub Enterprise host support.

@@ -1,0 +1,1 @@
+Client-only Android app. REST + GraphQL + Room cache + WorkManager + WebView fallback.
