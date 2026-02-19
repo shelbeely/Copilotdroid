@@ -26,7 +26,7 @@ class PullRequestRepository @Inject constructor(
     private val dao: PullRequestDao
 ) {
     fun observePullRequests(owner: String, repo: String): Flow<List<PullRequest>> =
-        dao.observePullRequests(owner, repo).map { entities ->
+        dao.getAllForRepo(owner, repo).map { entities ->
             entities.map { it.toDomain() }
         }
 
@@ -53,24 +53,29 @@ class PullRequestRepository @Inject constructor(
                 ?: return false
 
             val entities = nodes.filterNotNull().map { node ->
+                val isAgentPr = node.labels?.nodes
+                    ?.filterNotNull()
+                    ?.any { it.name.contains("copilot", ignoreCase = true) } == true
                 PullRequestEntity(
                     id = node.number.toLong(),
                     number = node.number,
                     title = node.title,
-                    body = null,
+                    body = "",
                     state = node.state.rawValue,
-                    owner = owner,
-                    repo = repo,
-                    headBranch = node.headRefName,
-                    baseBranch = node.baseRefName,
+                    repoOwner = owner,
+                    repoName = repo,
+                    htmlUrl = "",
+                    headRef = node.headRefName,
+                    baseRef = node.baseRefName,
                     authorLogin = node.author?.login ?: "",
-                    authorAvatarUrl = node.author?.avatarUrl?.toString(),
+                    authorAvatarUrl = node.author?.avatarUrl?.toString() ?: "",
                     createdAt = node.createdAt.toString(),
                     updatedAt = node.updatedAt.toString(),
                     isDraft = false,
-                    hasAgentAssigned = node.labels?.nodes
-                        ?.filterNotNull()
-                        ?.any { it.name.contains("copilot", ignoreCase = true) } == true
+                    mergedAt = null,
+                    labels = "[]",
+                    isAgentPr = isAgentPr,
+                    lastSyncedAt = System.currentTimeMillis()
                 )
             }
             dao.upsertAll(entities)
@@ -88,22 +93,27 @@ class PullRequestRepository @Inject constructor(
             state = "all"
         )
         val entities = dtos.map { dto ->
+            val isAgentPr = dto.labels.any { it.name.contains("copilot", ignoreCase = true) }
             PullRequestEntity(
                 id = dto.id,
                 number = dto.number,
                 title = dto.title,
-                body = dto.body,
+                body = dto.body ?: "",
                 state = dto.state.uppercase(),
-                owner = owner,
-                repo = repo,
-                headBranch = dto.head.ref,
-                baseBranch = dto.base.ref,
+                repoOwner = owner,
+                repoName = repo,
+                htmlUrl = "",
+                headRef = dto.head.ref,
+                baseRef = dto.base.ref,
                 authorLogin = dto.user.login,
-                authorAvatarUrl = dto.user.avatarUrl,
+                authorAvatarUrl = dto.user.avatarUrl ?: "",
                 createdAt = dto.createdAt,
                 updatedAt = dto.updatedAt,
                 isDraft = dto.draft,
-                hasAgentAssigned = dto.labels.any { it.name.contains("copilot", ignoreCase = true) }
+                mergedAt = null,
+                labels = "[]",
+                isAgentPr = isAgentPr,
+                lastSyncedAt = System.currentTimeMillis()
             )
         }
         dao.upsertAll(entities)
@@ -145,22 +155,22 @@ class PullRequestRepository @Inject constructor(
         id = id,
         number = number,
         title = title,
-        body = body,
-        state = when (state) {
+        body = body.ifEmpty { null },
+        state = when (state.uppercase()) {
             "OPEN" -> PullRequestState.OPEN
             "CLOSED" -> PullRequestState.CLOSED
             "MERGED" -> PullRequestState.MERGED
             else -> PullRequestState.OPEN
         },
-        owner = owner,
-        repo = repo,
-        headBranch = headBranch,
-        baseBranch = baseBranch,
+        owner = repoOwner,
+        repo = repoName,
+        headBranch = headRef,
+        baseBranch = baseRef,
         authorLogin = authorLogin,
-        authorAvatarUrl = authorAvatarUrl,
+        authorAvatarUrl = authorAvatarUrl.ifEmpty { null },
         createdAt = createdAt,
         updatedAt = updatedAt,
         isDraft = isDraft,
-        hasAgentAssigned = hasAgentAssigned
+        hasAgentAssigned = isAgentPr
     )
 }

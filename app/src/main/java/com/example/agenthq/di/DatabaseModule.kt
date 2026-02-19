@@ -3,7 +3,11 @@ package com.example.agenthq.di
 import android.content.Context
 import androidx.room.Room
 import com.example.agenthq.data.local.AgentHQDatabase
+import com.example.agenthq.data.local.AgentSessionDao
+import com.example.agenthq.data.local.CommentDao
 import com.example.agenthq.data.local.PullRequestDao
+import com.example.agenthq.data.local.RepositoryDao
+import com.example.agenthq.data.local.ReviewDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,8 +26,20 @@ object DatabaseModule {
             context,
             AgentHQDatabase::class.java,
             "agent_hq.db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
 
     @Provides
     fun providePullRequestDao(db: AgentHQDatabase): PullRequestDao = db.pullRequestDao()
+
+    @Provides
+    fun provideAgentSessionDao(db: AgentHQDatabase): AgentSessionDao = db.agentSessionDao()
+
+    @Provides
+    fun provideReviewDao(db: AgentHQDatabase): ReviewDao = db.reviewDao()
+
+    @Provides
+    fun provideCommentDao(db: AgentHQDatabase): CommentDao = db.commentDao()
+
+    @Provides
+    fun provideRepositoryDao(db: AgentHQDatabase): RepositoryDao = db.repositoryDao()
 }

@@ -9,15 +9,30 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PullRequestDao {
 
-    @Query("SELECT * FROM pull_requests WHERE owner = :owner AND repo = :repo ORDER BY updatedAt DESC")
-    fun observePullRequests(owner: String, repo: String): Flow<List<PullRequestEntity>>
-
-    @Query("SELECT * FROM pull_requests WHERE id = :id")
-    suspend fun getPullRequestById(id: Long): PullRequestEntity?
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(pr: PullRequestEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(pullRequests: List<PullRequestEntity>)
+    suspend fun upsertAll(prs: List<PullRequestEntity>)
 
-    @Query("DELETE FROM pull_requests WHERE owner = :owner AND repo = :repo")
-    suspend fun deleteByRepo(owner: String, repo: String)
+    @Query("SELECT * FROM pull_requests ORDER BY updatedAt DESC")
+    fun getAll(): Flow<List<PullRequestEntity>>
+
+    @Query("SELECT * FROM pull_requests WHERE repoOwner = :owner AND repoName = :name ORDER BY updatedAt DESC")
+    fun getAllForRepo(owner: String, name: String): Flow<List<PullRequestEntity>>
+
+    @Query("SELECT * FROM pull_requests WHERE id = :id")
+    suspend fun getById(id: Long): PullRequestEntity?
+
+    @Query("SELECT * FROM pull_requests WHERE repoOwner = :owner AND repoName = :name AND number = :number LIMIT 1")
+    suspend fun getByNumber(owner: String, name: String, number: Int): PullRequestEntity?
+
+    @Query("SELECT * FROM pull_requests WHERE isAgentPr = 1 ORDER BY updatedAt DESC")
+    fun getAgentPrs(): Flow<List<PullRequestEntity>>
+
+    @Query("DELETE FROM pull_requests WHERE lastSyncedAt < :timestamp")
+    suspend fun deleteOlderThan(timestamp: Long)
+
+    @Query("SELECT COUNT(*) FROM pull_requests")
+    suspend fun count(): Int
 }

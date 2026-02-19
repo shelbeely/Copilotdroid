@@ -7,17 +7,22 @@ import androidx.room.PrimaryKey
 data class PullRequestEntity(
     @PrimaryKey val id: Long,
     val number: Int,
+    val repoOwner: String,
+    val repoName: String,
     val title: String,
-    val body: String?,
     val state: String,
-    val owner: String,
-    val repo: String,
-    val headBranch: String,
-    val baseBranch: String,
+    val htmlUrl: String,
     val authorLogin: String,
-    val authorAvatarUrl: String?,
+    val authorAvatarUrl: String,
+    val headRef: String,
+    val baseRef: String,
+    val body: String,
+    val isDraft: Boolean,
     val createdAt: String,
     val updatedAt: String,
-    val isDraft: Boolean,
-    val hasAgentAssigned: Boolean
+    val mergedAt: String?,
+    /** JSON array of label name strings */
+    val labels: String,
+    val isAgentPr: Boolean,
+    val lastSyncedAt: Long
 )
