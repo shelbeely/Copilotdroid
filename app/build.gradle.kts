@@ -87,6 +87,7 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
     implementation(libs.work.hilt)
+    ksp(libs.hilt.compiler)
 
     // Security
     implementation(libs.security.crypto)

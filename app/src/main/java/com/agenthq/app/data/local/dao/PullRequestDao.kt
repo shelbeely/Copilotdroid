@@ -26,4 +26,7 @@ interface PullRequestDao {
 
     @Query("SELECT COUNT(*) FROM pull_requests")
     suspend fun getCount(): Int
+
+    @Query("SELECT * FROM pull_requests WHERE isCopilotSession = 1")
+    suspend fun getCopilotSessionsSnapshot(): List<CachedPullRequest>
 }
