@@ -48,23 +48,35 @@ class SyncWorker @AssistedInject constructor(
         oldSessions: Map<Long, CachedPullRequest>,
         newSessions: List<CachedPullRequest>
     ) {
-        var notificationIndex = 0
+        val changes = mutableListOf<Pair<String, String>>()
         for (session in newSessions) {
             val old = oldSessions[session.id]
             if (old == null) {
-                notificationHelper.showSessionUpdateNotification(
-                    title = "New Copilot Session",
-                    message = "${session.repoFullName}#${session.number}: ${session.title}",
-                    notificationId = NOTIFICATION_ID_BASE + notificationIndex++
+                changes.add(
+                    "New Copilot Session" to
+                        "${session.repoFullName}#${session.number}: ${session.title}"
                 )
             } else if (old.state != session.state) {
                 val statusLabel = session.state.replaceFirstChar { it.uppercase() }
-                notificationHelper.showSessionUpdateNotification(
-                    title = "Session $statusLabel",
-                    message = "${session.repoFullName}#${session.number}: ${session.title}",
-                    notificationId = NOTIFICATION_ID_BASE + notificationIndex++
+                changes.add(
+                    "Session $statusLabel" to
+                        "${session.repoFullName}#${session.number}: ${session.title}"
                 )
             }
+        }
+
+        if (changes.size == 1) {
+            notificationHelper.showSessionUpdateNotification(
+                title = changes[0].first,
+                message = changes[0].second,
+                notificationId = NOTIFICATION_ID_BASE
+            )
+        } else if (changes.size > 1) {
+            notificationHelper.showSessionUpdateNotification(
+                title = "${changes.size} session updates",
+                message = changes.joinToString(", ") { it.second },
+                notificationId = NOTIFICATION_ID_BASE
+            )
         }
     }
 }
