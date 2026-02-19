@@ -1,0 +1,1 @@
+Use official GitHub REST + GraphQL only. No invented endpoints.
