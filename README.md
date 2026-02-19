@@ -1,26 +1,58 @@
-# Agent HQ Android — Full Build Kit 🐝
+# Agent HQ Android — Copilot Coding Agent Session Manager
 
-This is a complete upload-ready repository to build a standalone Android app for managing GitHub Copilot Coding Agent sessions.
+An Android app for monitoring and managing GitHub Copilot coding-agent sessions — review PRs, steer in-progress work, and stay on top of your AI-assisted development workflow.
 
-## Contains
-- Full product requirements
-- Architecture docs
-- API plan
-- UX specs
-- Wireframes
-- Engineering rules
-- Milestone backlog
-- Complete prompt pipeline (0→100 build + enhancements + recovery)
+## Features
 
-## How to use
+- **Dashboard** — real-time overview of all active Copilot agent sessions
+- **PR Review** — review and approve Copilot-generated pull requests on the go
+- **Session Steering** — send follow-up instructions or stop a running session
+- **Notifications** — push alerts for session completion, failures, and review requests
+- **Offline Cache** — Room-backed local storage so you can browse sessions without connectivity
 
-1. Upload this repo to GitHub.
-2. Start GitHub Copilot Coding Agent.
-3. Run:
+## Architecture
+
+| Layer | Technology |
+|-------|-----------|
+| UI | Jetpack Compose + Material 3 |
+| Navigation | Navigation Compose |
+| DI | Hilt |
+| Networking | Retrofit + OkHttp |
+| Local DB | Room |
+| Background | WorkManager |
+| Auth | Encrypted SharedPreferences (AndroidX Security) |
+
+## Build
+
+```bash
+# Debug build
+./gradlew assembleDebug
+
+# Run unit tests
+./gradlew testDebugUnitTest
+```
+
+Requires JDK 17 and Android SDK 35.
+
+## Project Structure
 
 ```
-Execute prompts/00_run_all.md
+app/src/main/java/com/agenthq/app/
+├── data/
+│   ├── api/          # Retrofit services & API models
+│   ├── auth/         # OAuth / token management
+│   ├── db/           # Room database, DAOs, entities
+│   └── session/      # Copilot session inference engine
+├── di/               # Hilt modules
+├── ui/               # Compose screens & view models
+└── worker/           # WorkManager background jobs
 ```
 
-The agent will build the entire project step-by-step.
+## Screenshots
+
+> _Screenshots coming soon._
+
+## License
+
+See [LICENSE](LICENSE) for details.
 
