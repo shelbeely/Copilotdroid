@@ -75,6 +75,22 @@ class AuthRepository internal constructor(
         }
     }
 
+    /**
+     * Authenticate using a GitHub Personal Access Token (PAT).
+     * This path requires no OAuth App registration and is suitable for
+     * development and testing before a client ID is available.
+     * Generate a token at https://github.com/settings/tokens with the
+     * `repo` and `read:user` scopes.
+     */
+    fun loginWithPat(token: String): Flow<AuthState> = flow {
+        if (token.isBlank()) {
+            emit(AuthState.Error("Personal Access Token cannot be empty."))
+            return@flow
+        }
+        tokenStore.saveToken(token)
+        emit(AuthState.Success)
+    }
+
     fun isLoggedIn(): Boolean = tokenStore.hasToken()
     fun logout() = tokenStore.clearToken()
 }

@@ -54,4 +54,19 @@ class AuthRepositoryTest {
         assertTrue(lastState is AuthState.Error)
         assertTrue((lastState as AuthState.Error).message.contains("GITHUB_CLIENT_ID"))
     }
+
+    @Test
+    fun `loginWithPat saves token and emits Success`() = runTest {
+        val states = repository.loginWithPat("ghp_testtoken123").toList()
+        verify { tokenStore.saveToken("ghp_testtoken123") }
+        assertTrue(states.last() is AuthState.Success)
+    }
+
+    @Test
+    fun `loginWithPat emits error when token is blank`() = runTest {
+        val states = repository.loginWithPat("  ").toList()
+        val last = states.last()
+        assertTrue(last is AuthState.Error)
+        assertTrue((last as AuthState.Error).message.contains("empty"))
+    }
 }
