@@ -18,12 +18,15 @@ sealed class AuthState {
 }
 
 @Singleton
-class AuthRepository @Inject constructor(
+class AuthRepository internal constructor(
     private val tokenStore: TokenStore,
-    private val hostPreferences: HostPreferences
-) {
+    private val hostPreferences: HostPreferences,
     private val clientId: String
-        get() = BuildConfigHelper.GITHUB_CLIENT_ID
+) {
+    @Inject constructor(
+        tokenStore: TokenStore,
+        hostPreferences: HostPreferences
+    ) : this(tokenStore, hostPreferences, BuildConfigHelper.GITHUB_CLIENT_ID)
 
     private fun buildDeviceAuthService(oauthBase: String): GitHubDeviceAuthService =
         Retrofit.Builder()
@@ -35,6 +38,10 @@ class AuthRepository @Inject constructor(
     fun startDeviceFlow(): Flow<AuthState> = flow {
         emit(AuthState.Idle)
         try {
+            if (clientId.isBlank() || clientId == BuildConfigHelper.UNCONFIGURED_CLIENT_ID) {
+                emit(AuthState.Error("GitHub Client ID is not configured. Set GITHUB_CLIENT_ID in your build environment."))
+                return@flow
+            }
             val host = hostPreferences.githubHost.first()
             val oauthBase = HostPreferences.oauthBaseFor(host)
             val deviceAuthService = buildDeviceAuthService(oauthBase)

@@ -24,6 +24,8 @@ android {
         }
 
         buildConfigField("Boolean", "IS_ENTERPRISE_BUILD", "false")
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${System.getenv("GITHUB_CLIENT_ID") ?: "NOT_CONFIGURED"}\"")
+
     }
 
     signingConfigs {
