@@ -73,13 +73,13 @@ jobs:
 
     steps:
       - name: Download debug APK artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: debug-apk
           path: artifacts/debug
 
       - name: Download release APK artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: release-apk
           path: artifacts/release
