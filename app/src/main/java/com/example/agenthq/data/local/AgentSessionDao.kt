@@ -24,6 +24,9 @@ interface AgentSessionDao {
     @Query("SELECT * FROM agent_sessions WHERE pullRequestId = :prId LIMIT 1")
     suspend fun getByPrId(prId: Long): AgentSessionEntity?
 
+    @Query("SELECT * FROM agent_sessions ORDER BY lastActivityAt DESC")
+    suspend fun getAllOnce(): List<AgentSessionEntity>
+
     @Query("SELECT * FROM agent_sessions WHERE status IN ('active', 'paused') ORDER BY lastActivityAt DESC")
     fun getActiveSessions(): Flow<List<AgentSessionEntity>>
 
