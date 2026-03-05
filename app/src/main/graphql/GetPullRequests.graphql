@@ -1,0 +1,39 @@
+query GetPullRequests($owner: String!, $repo: String!, $first: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(first: $first, after: $after, states: [OPEN, CLOSED, MERGED]) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        number
+        title
+        state
+        createdAt
+        updatedAt
+        url
+        headRefName
+        baseRefName
+        author {
+          login
+          avatarUrl
+        }
+        labels(first: 10) {
+          nodes {
+            name
+            color
+          }
+        }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
