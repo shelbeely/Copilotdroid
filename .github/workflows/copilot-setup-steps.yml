@@ -1,0 +1,135 @@
+name: "Copilot Setup Steps"
+
+# Run automatically when this file changes (so CI validates the setup), and
+# allow manual runs from the Actions tab for ad-hoc verification.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    # 59 is the maximum value allowed for copilot-setup-steps jobs (per GitHub docs).
+    timeout-minutes: 59
+
+    # Lowest permissions needed: read access to clone the repo.
+    permissions:
+      contents: read
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Source code
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. JDK – Temurin 17 (Adoptium) with Gradle cache
+      #    https://github.com/adoptium/temurin-build
+      # -----------------------------------------------------------------------
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # -----------------------------------------------------------------------
+      # 3. Build the debug APK so Copilot can install / inspect it immediately
+      # -----------------------------------------------------------------------
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      # -----------------------------------------------------------------------
+      # 4. Android emulator – hardware acceleration (KVM)
+      # -----------------------------------------------------------------------
+      - name: Enable KVM hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # -----------------------------------------------------------------------
+      # 5. Android SDK – accept licenses and install emulator + system image
+      #    API 35 (android-35), google_apis, x86_64 matches the app's targetSdk
+      # -----------------------------------------------------------------------
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android emulator, platform-tools, and system image
+        run: |
+          sdkmanager \
+            "emulator" \
+            "platform-tools" \
+            "system-images;android-35;google_apis;x86_64"
+
+      # Expose adb / emulator on PATH for Copilot and subsequent steps
+      - name: Add Android SDK tools to PATH
+        run: |
+          echo "$ANDROID_HOME/emulator"       >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+      # -----------------------------------------------------------------------
+      # 6. Create the Android Virtual Device (AVD)
+      # -----------------------------------------------------------------------
+      - name: Create Android Virtual Device
+        run: |
+          echo "no" | avdmanager create avd \
+            --name "copilot_avd" \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_6" \
+            --force
+
+      # -----------------------------------------------------------------------
+      # 7. Start the emulator in the background (headless, software GPU)
+      # -----------------------------------------------------------------------
+      - name: Start Android emulator
+        # -memory 2048: 2 GiB is sufficient for the Pixel 6 AVD profile without
+        # exhausting the CI runner's available RAM.
+        run: |
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd copilot_avd \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -camera-back none \
+            -camera-front none \
+            -memory 2048 \
+            > /tmp/emulator.log 2>&1 &
+          echo "Emulator launched (PID $!)"
+
+      # -----------------------------------------------------------------------
+      # 8. Wait for the emulator to finish booting
+      # -----------------------------------------------------------------------
+      - name: Wait for emulator to boot
+        run: |
+          adb wait-for-device
+          until adb shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; do
+            echo "Waiting for emulator to boot…"
+            sleep 5
+          done
+          adb shell input keyevent 82
+          echo "Emulator is ready"
+          adb devices -l
+
+      # -----------------------------------------------------------------------
+      # 9. Install the debug APK – verbose output aids APK debugging
+      # -----------------------------------------------------------------------
+      - name: Install debug APK on emulator
+        run: |
+          adb install -r -t -d \
+            app/build/outputs/apk/debug/app-debug.apk
+          echo "=== Installed packages (agenthq) ==="
+          adb shell pm list packages | grep agenthq || echo "(package not found after install)"
+          echo "=== APK install complete ==="
