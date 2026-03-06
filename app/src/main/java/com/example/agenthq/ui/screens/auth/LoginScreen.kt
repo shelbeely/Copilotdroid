@@ -1,12 +1,17 @@
 package com.example.agenthq.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,6 +54,9 @@ fun LoginScreen(
                 ) {
                     Text("Sign in with GitHub")
                 }
+
+                Spacer(Modifier.height(16.dp))
+                PatLoginSection(onSubmit = { token -> viewModel.loginWithPat(token) })
             }
             is AuthState.WaitingForUser -> {
                 Text(
@@ -95,3 +103,65 @@ fun LoginScreen(
         }
     }
 }
+
+/** Collapsible section that lets a developer sign in with a Personal Access Token. */
+@Composable
+private fun PatLoginSection(onSubmit: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    var pat by remember { mutableStateOf("") }
+    var patVisible by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+
+    TextButton(
+        onClick = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(if (expanded) "Cancel" else "Use Personal Access Token")
+    }
+
+    if (expanded) {
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = pat,
+            onValueChange = { pat = it },
+            label = { Text("Personal Access Token") },
+            placeholder = { Text("ghp_…") },
+            singleLine = true,
+            visualTransformation = if (patVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { patVisible = !patVisible }) {
+                    Icon(
+                        imageVector = if (patVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (patVisible) "Hide token" else "Show token"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Generate a token with repo and read:user scopes at:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        TextButton(
+            onClick = { uriHandler.openUri("https://github.com/settings/tokens") },
+            contentPadding = PaddingValues(vertical = 0.dp)
+        ) {
+            Text(
+                text = "github.com/settings/tokens",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { onSubmit(pat) },
+            enabled = pat.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Sign in with PAT")
+        }
+    }
+}
+

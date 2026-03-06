@@ -18,12 +18,15 @@ sealed class AuthState {
 }
 
 @Singleton
-class AuthRepository @Inject constructor(
+class AuthRepository internal constructor(
     private val tokenStore: TokenStore,
-    private val hostPreferences: HostPreferences
-) {
+    private val hostPreferences: HostPreferences,
     private val clientId: String
-        get() = BuildConfigHelper.GITHUB_CLIENT_ID
+) {
+    @Inject constructor(
+        tokenStore: TokenStore,
+        hostPreferences: HostPreferences
+    ) : this(tokenStore, hostPreferences, BuildConfigHelper.GITHUB_CLIENT_ID)
 
     private fun buildDeviceAuthService(oauthBase: String): GitHubDeviceAuthService =
         Retrofit.Builder()
@@ -35,6 +38,10 @@ class AuthRepository @Inject constructor(
     fun startDeviceFlow(): Flow<AuthState> = flow {
         emit(AuthState.Idle)
         try {
+            if (clientId.isBlank() || clientId == BuildConfigHelper.UNCONFIGURED_CLIENT_ID) {
+                emit(AuthState.Error("GitHub Client ID is not configured. Set GITHUB_CLIENT_ID in your build environment."))
+                return@flow
+            }
             val host = hostPreferences.githubHost.first()
             val oauthBase = HostPreferences.oauthBaseFor(host)
             val deviceAuthService = buildDeviceAuthService(oauthBase)
@@ -66,6 +73,22 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             emit(AuthState.Error(e.message ?: "Unknown error"))
         }
+    }
+
+    /**
+     * Authenticate using a GitHub Personal Access Token (PAT).
+     * This path requires no OAuth App registration and is suitable for
+     * development and testing before a client ID is available.
+     * Generate a token at https://github.com/settings/tokens with the
+     * `repo` and `read:user` scopes.
+     */
+    fun loginWithPat(token: String): Flow<AuthState> = flow {
+        if (token.isBlank()) {
+            emit(AuthState.Error("Personal Access Token cannot be empty."))
+            return@flow
+        }
+        tokenStore.saveToken(token)
+        emit(AuthState.Success)
     }
 
     fun isLoggedIn(): Boolean = tokenStore.hasToken()

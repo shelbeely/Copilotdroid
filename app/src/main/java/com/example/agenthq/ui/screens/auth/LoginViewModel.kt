@@ -24,4 +24,12 @@ class LoginViewModel @Inject constructor(
             }
         }
     }
+
+    fun loginWithPat(token: String) {
+        viewModelScope.launch {
+            authRepository.loginWithPat(token).collect { state ->
+                _authState.value = state
+            }
+        }
+    }
 }
