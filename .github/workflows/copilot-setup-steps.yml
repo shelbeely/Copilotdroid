@@ -41,7 +41,25 @@ jobs:
           cache: gradle
 
       # -----------------------------------------------------------------------
-      # 3. Build the debug APK so Copilot can install / inspect it immediately
+      # 3. Android SDK – accept licenses and install the SDK platform BEFORE
+      #    building so that compileSdk = 36 resolves correctly.
+      #
+      #    Android 16 (API 36) — platform-stable, available in the default
+      #    (stable) sdkmanager channel.
+      #
+      #    To switch to Android 17 (API 37, "Cinnamon Bun" Beta) instead:
+      #      • Add --channel=3 to every sdkmanager call below
+      #      • Replace all "android-36" occurrences with "android-37"
+      #      • Use build-tools;37.0.0 in the sdkmanager install line
+      # -----------------------------------------------------------------------
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android SDK platform 36
+        run: sdkmanager "platforms;android-36"
+
+      # -----------------------------------------------------------------------
+      # 4. Build the debug APK so Copilot can install / inspect it immediately
       # -----------------------------------------------------------------------
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -50,7 +68,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       # -----------------------------------------------------------------------
-      # 4. Android emulator – hardware acceleration (KVM)
+      # 5. Android emulator – hardware acceleration (KVM)
       # -----------------------------------------------------------------------
       - name: Enable KVM hardware acceleration
         run: |
@@ -60,18 +78,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       # -----------------------------------------------------------------------
-      # 5. Android SDK – accept licenses and install emulator + system image
-      #    API 35 (android-35), google_apis, x86_64 matches the app's targetSdk
+      # 6. Install emulator, platform-tools, and the API 36 system image.
+      #    google_apis;x86_64 is the only available variant for API 36
+      #    ("default" images are absent for Android 16 — known upstream issue).
       # -----------------------------------------------------------------------
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
-
       - name: Install Android emulator, platform-tools, and system image
         run: |
           sdkmanager \
             "emulator" \
             "platform-tools" \
-            "system-images;android-35;google_apis;x86_64"
+            "system-images;android-36;google_apis;x86_64"
 
       # Expose adb / emulator on PATH for Copilot and subsequent steps
       - name: Add Android SDK tools to PATH
@@ -80,18 +96,18 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
       # -----------------------------------------------------------------------
-      # 6. Create the Android Virtual Device (AVD)
+      # 7. Create the Android Virtual Device (AVD)
       # -----------------------------------------------------------------------
       - name: Create Android Virtual Device
         run: |
           echo "no" | avdmanager create avd \
             --name "copilot_avd" \
-            --package "system-images;android-35;google_apis;x86_64" \
+            --package "system-images;android-36;google_apis;x86_64" \
             --device "pixel_6" \
             --force
 
       # -----------------------------------------------------------------------
-      # 7. Start the emulator in the background (headless, software GPU)
+      # 8. Start the emulator in the background (headless, software GPU)
       # -----------------------------------------------------------------------
       - name: Start Android emulator
         # -memory 2048: 2 GiB is sufficient for the Pixel 6 AVD profile without
@@ -110,7 +126,7 @@ jobs:
           echo "Emulator launched (PID $!)"
 
       # -----------------------------------------------------------------------
-      # 8. Wait for the emulator to finish booting
+      # 9. Wait for the emulator to finish booting
       # -----------------------------------------------------------------------
       - name: Wait for emulator to boot
         run: |
@@ -124,7 +140,7 @@ jobs:
           adb devices -l
 
       # -----------------------------------------------------------------------
-      # 9. Install the debug APK – verbose output aids APK debugging
+      # 10. Install the debug APK – verbose output aids APK debugging
       # -----------------------------------------------------------------------
       - name: Install debug APK on emulator
         run: |
@@ -133,3 +149,4 @@ jobs:
           echo "=== Installed packages (agenthq) ==="
           adb shell pm list packages | grep agenthq || echo "(package not found after install)"
           echo "=== APK install complete ==="
+

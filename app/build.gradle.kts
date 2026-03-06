@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.example.agenthq"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.agenthq"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = System.getenv("GITHUB_REF_NAME")?.removePrefix("v") ?: "1.0.0"
 
