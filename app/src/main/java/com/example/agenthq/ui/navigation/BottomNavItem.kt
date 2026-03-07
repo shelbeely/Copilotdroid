@@ -1,12 +1,12 @@
 package com.example.agenthq.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
+import androidx.compose.material.icons.automirrored.outlined.MergeType
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.MergeType
 import androidx.compose.ui.graphics.vector.ImageVector
 
 data class BottomNavItem(
@@ -26,8 +26,8 @@ val bottomNavItems = listOf(
     BottomNavItem(
         screen = Screen.PullRequests,
         label = "PRs",
-        selectedIcon = Icons.Filled.MergeType,
-        unselectedIcon = Icons.Outlined.MergeType
+        selectedIcon = Icons.AutoMirrored.Filled.MergeType,
+        unselectedIcon = Icons.AutoMirrored.Outlined.MergeType
     ),
     BottomNavItem(
         screen = Screen.Analytics,
