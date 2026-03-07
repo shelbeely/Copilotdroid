@@ -1,10 +1,9 @@
-package com.example.agenthq.ui.screens.dashboard
+package com.example.agenthq.ui.screens.pullrequest
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.agenthq.data.repository.AgentSessionRepository
-import com.example.agenthq.domain.model.AgentSessionUiModel
-import com.example.agenthq.domain.usecase.SyncRepositoriesUseCase
+import com.example.agenthq.data.local.PullRequestDao
+import com.example.agenthq.data.local.PullRequestEntity
 import com.example.agenthq.domain.usecase.SyncSessionsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,39 +12,38 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class DashboardUiState(
-    val sessions: List<AgentSessionUiModel> = emptyList(),
+data class PullRequestListUiState(
+    val pullRequests: List<PullRequestEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null
 )
 
 @HiltViewModel
-class DashboardViewModel @Inject constructor(
-    private val agentSessionRepository: AgentSessionRepository,
-    private val syncRepositoriesUseCase: SyncRepositoriesUseCase,
+class PullRequestListViewModel @Inject constructor(
+    private val pullRequestDao: PullRequestDao,
     private val syncSessionsUseCase: SyncSessionsUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
-    val uiState: StateFlow<DashboardUiState> = _uiState
+    private val _uiState = MutableStateFlow(PullRequestListUiState())
+    val uiState: StateFlow<PullRequestListUiState> = _uiState
 
     init {
-        observeSessions()
+        observePullRequests()
     }
 
-    private fun observeSessions() {
+    private fun observePullRequests() {
         viewModelScope.launch {
-            agentSessionRepository.getAgentSessions()
+            pullRequestDao.getAll()
                 .catch { e ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = e.message ?: "Unknown error"
                     )
                 }
-                .collect { sessions ->
+                .collect { prs ->
                     _uiState.value = _uiState.value.copy(
-                        sessions = sessions,
+                        pullRequests = prs,
                         isLoading = false,
                         error = null
                     )
@@ -57,7 +55,6 @@ class DashboardViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isRefreshing = true, error = null)
         viewModelScope.launch {
             try {
-                syncRepositoriesUseCase()
                 syncSessionsUseCase()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Sync failed")
@@ -65,9 +62,5 @@ class DashboardViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isRefreshing = false)
             }
         }
-    }
-
-    fun dismissError() {
-        _uiState.value = _uiState.value.copy(error = null)
     }
 }
