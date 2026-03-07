@@ -44,6 +44,10 @@ jobs:
       # 3. Android SDK – accept licenses and install the SDK platform BEFORE
       #    building so that compileSdk = 36 resolves correctly.
       #
+      #    sdkmanager lives in $ANDROID_HOME/cmdline-tools/latest/bin/ which
+      #    is not on PATH by default on the GitHub-hosted ubuntu-latest runner,
+      #    so we add it to PATH first and then use it for all subsequent calls.
+      #
       #    Android 16 (API 36) — platform-stable, available in the default
       #    (stable) sdkmanager channel.
       #
@@ -52,11 +56,14 @@ jobs:
       #      • Replace all "android-36" occurrences with "android-37"
       #      • Use build-tools;37.0.0 in the sdkmanager install line
       # -----------------------------------------------------------------------
+      - name: Add Android SDK cmdline-tools to PATH
+        run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
 
       - name: Install Android SDK platform 36
-        run: sdkmanager "platforms;android-36"
+        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
 
       # -----------------------------------------------------------------------
       # 4. Build the debug APK so Copilot can install / inspect it immediately
@@ -84,7 +91,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Install Android emulator, platform-tools, and system image
         run: |
-          sdkmanager \
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "emulator" \
             "platform-tools" \
             "system-images;android-36;google_apis;x86_64"
@@ -100,7 +107,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Create Android Virtual Device
         run: |
-          echo "no" | avdmanager create avd \
+          echo "no" | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
             --name "copilot_avd" \
             --package "system-images;android-36;google_apis;x86_64" \
             --device "pixel_6" \
