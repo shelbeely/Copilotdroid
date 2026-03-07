@@ -140,17 +140,22 @@ private fun PatLoginSection(onSubmit: (String) -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Generate a token with repo and read:user scopes at:",
+            text = "Required scopes: repo (read/write PRs & comments) · read:user (profile)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
         TextButton(
-            onClick = { uriHandler.openUri("https://github.com/settings/tokens") },
+            onClick = {
+                uriHandler.openUri(
+                    "https://github.com/settings/tokens/new" +
+                        "?scopes=repo,read:user&description=Agent+HQ"
+                )
+            },
             contentPadding = PaddingValues(vertical = 0.dp)
         ) {
             Text(
-                text = "github.com/settings/tokens",
+                text = "Generate token (scopes pre-selected)",
                 style = MaterialTheme.typography.bodySmall
             )
         }
