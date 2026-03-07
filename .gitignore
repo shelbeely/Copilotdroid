@@ -43,8 +43,14 @@ captures/
 *.ipr
 
 # Keystore files
+# The shared debug keystore (app/debug.keystore) is intentionally tracked in
+# version control so every developer and CI machine builds debug APKs with the
+# same signing certificate.  Without a shared key, Android rejects updates
+# with "App not installed" when the installed APK was signed on a different
+# machine.  Release keystores must never be committed.
 *.jks
 *.keystore
+!app/debug.keystore
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

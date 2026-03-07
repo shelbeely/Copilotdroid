@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required for WorkManager foreground services on Android 14+ (API 34+).
+         Without this, WorkManager's SystemForegroundService cannot start on
+         devices that target API 34 or higher. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:name=".AgentHQApplication"
@@ -27,6 +31,15 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Declare the foreground service type on WorkManager's SystemForegroundService
+             so that Android 14+ (API 34+, targetSdk 36) allows it to start.
+             Without this override the merged manifest has no foregroundServiceType
+             and the OS refuses to start the service on Android 14+. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <activity
             android:name=".MainActivity"

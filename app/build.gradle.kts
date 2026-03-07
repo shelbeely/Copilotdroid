@@ -29,6 +29,17 @@ android {
     }
 
     signingConfigs {
+        // Shared debug keystore committed to the repository so that every
+        // developer and CI machine produces debug APKs with an identical
+        // signing certificate.  This prevents Android from rejecting an
+        // update with "App not installed" when the installed APK was signed
+        // by a different machine's auto-generated debug.keystore.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             storeFile = System.getenv("KEYSTORE_PATH")?.let { file(it) }
             storePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -50,6 +61,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
