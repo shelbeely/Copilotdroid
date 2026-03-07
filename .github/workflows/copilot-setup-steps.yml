@@ -104,7 +104,15 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
       # -----------------------------------------------------------------------
-      # 7. Create the Android Virtual Device (AVD)
+      # 7. Pin the AVD home directory so that both avdmanager and the emulator
+      #    binary resolve the same location, regardless of whether
+      #    ANDROID_SDK_HOME is set on the runner.
+      # -----------------------------------------------------------------------
+      - name: Set ANDROID_AVD_HOME
+        run: echo "ANDROID_AVD_HOME=$HOME/.android/avd" >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      # 8. Create the Android Virtual Device (AVD)
       # -----------------------------------------------------------------------
       - name: Create Android Virtual Device
         run: |
@@ -115,7 +123,7 @@ jobs:
             --force
 
       # -----------------------------------------------------------------------
-      # 8. Start the emulator in the background (headless, software GPU)
+      # 9. Start the emulator in the background (headless, software GPU)
       # -----------------------------------------------------------------------
       - name: Start Android emulator
         # -accel on:    use KVM hardware acceleration (enabled in step 5).
@@ -136,7 +144,7 @@ jobs:
           echo "Emulator launched (PID $!)"
 
       # -----------------------------------------------------------------------
-      # 9. Wait for the emulator to finish booting (5-minute timeout)
+      # 10. Wait for the emulator to finish booting (5-minute timeout)
       # -----------------------------------------------------------------------
       - name: Wait for emulator to boot
         run: |
@@ -164,7 +172,7 @@ jobs:
           adb devices -l
 
       # -----------------------------------------------------------------------
-      # 10. Install the debug APK – verbose output aids APK debugging
+      # 11. Install the debug APK – verbose output aids APK debugging
       # -----------------------------------------------------------------------
       - name: Install debug APK on emulator
         run: |
