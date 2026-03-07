@@ -18,9 +18,9 @@ jobs:
     # 59 is the maximum value allowed for copilot-setup-steps jobs (per GitHub docs).
     timeout-minutes: 59
 
-    # Lowest permissions needed: read access to clone the repo.
-    permissions:
-      contents: read
+    # Full permissions so Copilot can read, write, and interact with all
+    # repository resources (issues, PRs, checks, packages, etc.).
+    permissions: write-all
 
     steps:
       # -----------------------------------------------------------------------
@@ -117,6 +117,7 @@ jobs:
       # 8. Start the emulator in the background (headless, software GPU)
       # -----------------------------------------------------------------------
       - name: Start Android emulator
+        # -accel on:    use KVM hardware acceleration (enabled in step 5).
         # -memory 2048: 2 GiB is sufficient for the Pixel 6 AVD profile without
         # exhausting the CI runner's available RAM.
         run: |
@@ -126,6 +127,7 @@ jobs:
             -no-audio \
             -no-boot-anim \
             -gpu swiftshader_indirect \
+            -accel on \
             -camera-back none \
             -camera-front none \
             -memory 2048 \
@@ -133,14 +135,28 @@ jobs:
           echo "Emulator launched (PID $!)"
 
       # -----------------------------------------------------------------------
-      # 9. Wait for the emulator to finish booting
+      # 9. Wait for the emulator to finish booting (5-minute timeout)
       # -----------------------------------------------------------------------
       - name: Wait for emulator to boot
         run: |
-          adb wait-for-device
-          until adb shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; do
-            echo "Waiting for emulator to boot…"
+          # Give adb up to 60 s to detect the device before polling boot props.
+          if ! timeout 60 adb wait-for-device; then
+            echo "adb wait-for-device timed out — emulator log:"
+            cat /tmp/emulator.log
+            exit 1
+          fi
+          MAX_WAIT=300
+          WAITED=0
+          until adb shell getprop sys.boot_completed 2>/dev/null | grep -q "1" && \
+                adb shell getprop dev.bootcomplete    2>/dev/null | grep -q "1"; do
+            if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+              echo "Emulator boot timed out after ${MAX_WAIT}s — emulator log:"
+              cat /tmp/emulator.log
+              exit 1
+            fi
+            echo "Waiting for emulator to boot… (${WAITED}s elapsed)"
             sleep 5
+            WAITED=$((WAITED + 5))
           done
           adb shell input keyevent 82
           echo "Emulator is ready"
