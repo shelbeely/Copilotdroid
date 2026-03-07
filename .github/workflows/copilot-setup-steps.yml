@@ -41,8 +41,8 @@ jobs:
           cache: gradle
 
       # -----------------------------------------------------------------------
-      # 3. Android SDK – accept licenses and install the SDK platform BEFORE
-      #    building so that compileSdk = 36 resolves correctly.
+      # 3. Android SDK – cmdline-tools PATH, license acceptance, and SDK
+      #    platform install.
       #
       #    sdkmanager lives in $ANDROID_HOME/cmdline-tools/latest/bin/ which
       #    is not on PATH by default on the GitHub-hosted ubuntu-latest runner,
@@ -59,24 +59,28 @@ jobs:
       - name: Add Android SDK cmdline-tools to PATH
         run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
+      # Cache heavy SDK components (platform, system image, emulator,
+      # platform-tools) so subsequent runs skip the ~1 GB download.
+      - name: Cache Android SDK components
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/platforms/android-36
+            ${{ env.ANDROID_HOME }}/system-images/android-36
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/platform-tools
+          key: android-sdk-api36-${{ runner.os }}-v1
+
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
 
       - name: Install Android SDK platform 36
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
+          [ -d "$ANDROID_HOME/platforms/android-36" ] || \
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
 
       # -----------------------------------------------------------------------
-      # 4. Build the debug APK so Copilot can install / inspect it immediately
-      # -----------------------------------------------------------------------
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
-
-      # -----------------------------------------------------------------------
-      # 5. Android emulator – hardware acceleration (KVM)
+      # 4. Android emulator – hardware acceleration (KVM)
       # -----------------------------------------------------------------------
       - name: Enable KVM hardware acceleration
         run: |
@@ -86,16 +90,18 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       # -----------------------------------------------------------------------
-      # 6. Install emulator, platform-tools, and the API 36 system image.
+      # 5. Install emulator, platform-tools, and the API 36 system image.
       #    google_apis;x86_64 is the only available variant for API 36
       #    ("default" images are absent for Android 16 — known upstream issue).
+      #    Skipped automatically when the SDK cache is restored.
       # -----------------------------------------------------------------------
       - name: Install Android emulator, platform-tools, and system image
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "emulator" \
-            "platform-tools" \
-            "system-images;android-36;google_apis;x86_64"
+          PKGS=""
+          [ -d "$ANDROID_HOME/emulator" ]                                              || PKGS="$PKGS emulator"
+          [ -d "$ANDROID_HOME/platform-tools" ]                                        || PKGS="$PKGS platform-tools"
+          [ -d "$ANDROID_HOME/system-images/android-36/google_apis/x86_64" ]          || PKGS="$PKGS system-images;android-36;google_apis;x86_64"
+          [ -z "$PKGS" ] || "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" $PKGS
 
       # Expose adb / emulator on PATH for Copilot and subsequent steps
       - name: Add Android SDK tools to PATH
@@ -104,7 +110,7 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
       # -----------------------------------------------------------------------
-      # 7. Pin the AVD home directory so that both avdmanager and the emulator
+      # 6. Pin the AVD home directory so that both avdmanager and the emulator
       #    binary resolve the same location, regardless of whether
       #    ANDROID_SDK_HOME is set on the runner.
       # -----------------------------------------------------------------------
@@ -112,7 +118,7 @@ jobs:
         run: echo "ANDROID_AVD_HOME=$HOME/.android/avd" >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
-      # 8. Create the Android Virtual Device (AVD)
+      # 7. Create the Android Virtual Device (AVD)
       # -----------------------------------------------------------------------
       - name: Create Android Virtual Device
         run: |
@@ -123,12 +129,13 @@ jobs:
             --force
 
       # -----------------------------------------------------------------------
-      # 9. Start the emulator in the background (headless, software GPU)
+      # 8. Start the emulator in the background BEFORE building the APK so
+      #    that the ~3-5 min emulator boot overlaps with the Gradle build.
+      #    -accel on:    use KVM hardware acceleration (enabled in step 4).
+      #    -memory 2048: 2 GiB is sufficient for the Pixel 6 AVD profile without
+      #    exhausting the CI runner's available RAM.
       # -----------------------------------------------------------------------
       - name: Start Android emulator
-        # -accel on:    use KVM hardware acceleration (enabled in step 5).
-        # -memory 2048: 2 GiB is sufficient for the Pixel 6 AVD profile without
-        # exhausting the CI runner's available RAM.
         run: |
           nohup "$ANDROID_HOME/emulator/emulator" \
             -avd copilot_avd \
@@ -141,10 +148,22 @@ jobs:
             -camera-front none \
             -memory 2048 \
             > /tmp/emulator.log 2>&1 &
-          echo "Emulator launched (PID $!)"
+          echo "Emulator launched (PID $!) — build will proceed while it boots"
 
       # -----------------------------------------------------------------------
-      # 10. Wait for the emulator to finish booting (5-minute timeout)
+      # 9. Build the debug APK while the emulator is booting in the background.
+      #    --build-cache  re-uses task outputs across runs (stored in ~/.gradle).
+      #    --parallel     compiles independent modules concurrently.
+      # -----------------------------------------------------------------------
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --build-cache --parallel
+
+      # -----------------------------------------------------------------------
+      # 10. Wait for the emulator to finish booting (5-minute timeout).
+      #     By now the emulator has had the full build time to progress.
       # -----------------------------------------------------------------------
       - name: Wait for emulator to boot
         run: |
