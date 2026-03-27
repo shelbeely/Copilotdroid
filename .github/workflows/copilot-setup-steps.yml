@@ -201,3 +201,61 @@ jobs:
           adb shell pm list packages | grep agenthq || echo "(package not found after install)"
           echo "=== APK install complete ==="
 
+      # -----------------------------------------------------------------------
+      # 11. Launch the app and verify it starts without crashing
+      # -----------------------------------------------------------------------
+      - name: Launch app on emulator
+        run: |
+          # Start the main Activity via am start
+          adb shell am start -n "com.example.agenthq.debug/com.example.agenthq.MainActivity"
+          echo "=== am start issued; waiting 5 s for the app to render ==="
+          sleep 5
+          # Confirm the activity is in the foreground
+          CURRENT=$(adb shell dumpsys activity activities \
+            | grep -E "mResumedActivity|ResumedActivity" | head -1 || true)
+          echo "Resumed activity: $CURRENT"
+          if echo "$CURRENT" | grep -q "agenthq"; then
+            echo "✅  App is running in the foreground"
+          else
+            echo "⚠️  App may not be in the foreground – check the screenshot below"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 12. Capture a screenshot of the running app
+      # -----------------------------------------------------------------------
+      - name: Take screenshot of running app
+        run: |
+          mkdir -p /tmp/screenshots
+          adb exec-out screencap -p > /tmp/screenshots/app-debug-screenshot.png
+          echo "Screenshot saved to /tmp/screenshots/app-debug-screenshot.png"
+          ls -lh /tmp/screenshots/
+
+      - name: Upload app screenshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-screenshot
+          path: /tmp/screenshots/app-debug-screenshot.png
+          if-no-files-found: warn
+
+      # -----------------------------------------------------------------------
+      # 13. Capture logcat output for crash / error diagnostics
+      # -----------------------------------------------------------------------
+      - name: Capture logcat output
+        if: always()
+        run: |
+          mkdir -p /tmp/logs
+          # Dump the buffered logcat (all buffers) since device boot
+          adb logcat -d -b all \
+            | grep -E "agenthq|AndroidRuntime|FATAL|ActivityManager" \
+            > /tmp/logs/app-logcat.txt 2>&1 || true
+          echo "=== Last 50 lines of app logcat ==="
+          tail -50 /tmp/logs/app-logcat.txt || true
+
+      - name: Upload logcat artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-logcat
+          path: /tmp/logs/app-logcat.txt
+          if-no-files-found: warn
+
